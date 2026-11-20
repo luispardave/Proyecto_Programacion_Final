@@ -4,9 +4,10 @@ Nombre Completo: Luis Angel Pardave Garcia
 Fecha de creación: 05/11/2026
 Descripcion: Web app en Streamlit (DIJKSTRA-VISUALIZER) para crear un grafo,
              verlo en un lienzo y ejecutar Dijkstra de forma visual.
+             El grafo se guarda en la base de datos SQLite (grafo.db).
              La logica vive en grafo.py, db_handler.py y estilos.py;
              este archivo solo arma la interfaz.
-             Ejecutar con:  streamlit run app.py
+             Ejecutar con:  py main.py  (o  streamlit run app.py)
 """
 
 
