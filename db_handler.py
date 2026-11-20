@@ -112,6 +112,31 @@ def cargar_grafo_db(ruta=None):
     return nodos, conexiones
 
 
+# ===== DB: BORRAR EL REGISTRO DEL GRAFO =====
+def limpiar_db(ruta=None):
+    """Borra todos los nodos y conexiones (las tablas se conservan)."""
+    try:
+        guardar_grafo_db([], [], ruta)
+        print("Registro de la base de datos borrado.")
+    except sqlite3.Error as e:
+        print(f"Error: No se pudo limpiar la base de datos: {e}")
+
+
+# ===== DB: MIGRAR DATOS DE Nodos.csv A LA BASE =====
+def migrar_csv_a_db(ruta_csv=None, ruta_db=None):
+    """Pasa el grafo de Nodos.csv a la base de datos UNA sola vez: solo si
+    la base esta vacia y el CSV tiene datos. Regresa True si migro.
+    Puede lanzar ValueError/KeyError (CSV invalido) o sqlite3.Error."""
+    nodos_db, _ = cargar_grafo_db(ruta_db)
+    if nodos_db:
+        return False   # la base ya tiene un grafo, no se sobrescribe
+    nodos, conexiones = cargar_grafo_csv(ruta_csv)
+    if not nodos:
+        return False   # no hay CSV o esta vacio
+    guardar_grafo_db(nodos, conexiones, ruta_db)
+    return True
+
+
 # ===== EXCEPCIONES PERSONALIZADAS =====
 class NodoInvalidoError(Exception):
     """Se lanza cuando el nodo no es una sola letra."""
