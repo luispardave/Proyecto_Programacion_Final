@@ -2,11 +2,10 @@
 Titulo: grafo
 Nombre Completo: Luis Angel Pardave Garcia
 Fecha de creación: 29/10/2026
-Descripcion: Clase Grafo con algoritmo de Dijkstra que lee Nodos.csv
+Descripcion: Clase Grafo con algoritmo de Dijkstra. Se arma desde las
+             listas de nodos y conexiones guardadas en la base de datos
+             (ver Grafo.desde_listas y db_handler.cargar_grafo_db)
 """
-
-
-import csv
 
 
 # ===== CLASE NODO =====
@@ -69,22 +68,6 @@ class Grafo:
             acumulado += peso
             tramos.append((origen, siguiente, peso, acumulado))
         return tramos
-
-    # ----- Leer Nodos.csv y armar el grafo -----
-    def cargar_csv(self, ruta):
-        """Lee las conexiones de Nodos.csv (los errores se manejan en main)."""
-        with open(ruta, mode="r", encoding="utf-8") as file:
-            reader = csv.DictReader(file)
-            for row in reader:
-                # Fila sin destino ni peso = nodo sin conexiones
-                if not (row["destino"] or "").strip():
-                    self.agregar_nodo(row["origen"].strip())
-                    continue
-                peso = float(row["peso"])
-                # Conservar el peso como int si no tiene decimales
-                if peso.is_integer():
-                    peso = int(peso)
-                self.agregar_conexion(row["origen"], row["destino"], peso)
 
     # ----- Dijkstra: distancias minimas desde el nodo de inicio -----
     def calcular_distancias(self, inicio, destino=None):
