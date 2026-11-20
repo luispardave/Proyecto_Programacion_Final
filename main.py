@@ -7,7 +7,7 @@ Descripcion: Archivo principal, recaba inputs, guarda en CSV y ejecuta
 """
 
 
-import io_handler
+import db_handler
 from grafo import Grafo
 
 
@@ -33,12 +33,12 @@ def mostrar_resultado(grafo, inicio, destino, distancia, camino):
 def ejecutar_vuelta():
     """Ejecuta una vuelta completa del programa."""
     # 1. Recabar inputs y guardarlos en Nodos.csv
-    conexiones = io_handler.pedir_conexiones()
-    io_handler.guardar_csv(conexiones)
+    conexiones = db_handler.pedir_conexiones()
+    db_handler.guardar_csv(conexiones)
 
     # 2. Instanciar el grafo leyendo Nodos.csv
     grafo = Grafo()
-    grafo.cargar_csv(io_handler.RUTA_CSV)
+    grafo.cargar_csv(db_handler.RUTA_CSV)
 
     if not grafo.nodos:
         print("Error: El grafo no tiene nodos.")
@@ -46,7 +46,7 @@ def ejecutar_vuelta():
 
     # 3. Ejecutar Dijkstra, se puede repetir con los mismos nodos
     while True:
-        inicio, destino = io_handler.pedir_ruta(list(grafo.nodos))
+        inicio, destino = db_handler.pedir_ruta(list(grafo.nodos))
         distancia, camino = grafo.dijkstra(inicio, destino)
         mostrar_resultado(grafo, inicio, destino, distancia, camino)
 
@@ -75,7 +75,7 @@ def main():
                 print(f"Error inesperado: {type(e).__name__} - {e}")
             finally:
                 # 4. Borrar el registro para la siguiente vuelta
-                io_handler.limpiar_csv()
+                db_handler.limpiar_csv()
 
             otra = input("\n¿Hacer otra vuelta con nodos nuevos? "
                          "(s/n): ").strip().lower()
