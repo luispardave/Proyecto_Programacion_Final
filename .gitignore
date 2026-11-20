@@ -1,2 +1,6 @@
 __pycache__/
 *.pyc
+
+# Base de datos SQLite local (se crea sola al ejecutar el programa)
+*.db
+*.db-journal
