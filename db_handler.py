@@ -2,8 +2,9 @@
 Titulo: db_handler
 Nombre Completo: Luis Angel Pardave Garcia
 Fecha de creación: 29/10/2026
-Descripcion: Recaba y valida los inputs del usuario, maneja la lista de
-             conexiones y lee/guarda el formato CSV (Nodos.csv)
+Descripcion: Valida los datos del usuario, maneja la lista de conexiones,
+             guarda/carga el grafo en la base de datos SQLite (grafo.db) y
+             lo exporta a texto CSV
 """
 
 
@@ -12,8 +13,7 @@ import io
 import os
 import sqlite3
 
-# ===== CONFIGURACION DEL ARCHIVO CSV =====
-RUTA_CSV = os.path.join(os.path.dirname(__file__), "Nodos.csv")
+# ===== CONFIGURACION DE LA EXPORTACION CSV =====
 ENCABEZADOS = ["origen", "destino", "peso"]
 
 # ===== CONFIGURACION DE LA BASE DE DATOS SQLITE =====
@@ -110,16 +110,6 @@ def cargar_grafo_db(ruta=None):
     finally:
         conexion.close()
     return nodos, conexiones
-
-
-# ===== DB: BORRAR EL REGISTRO DEL GRAFO =====
-def limpiar_db(ruta=None):
-    """Borra todos los nodos y conexiones (las tablas se conservan)."""
-    try:
-        guardar_grafo_db([], [], ruta)
-        print("Registro de la base de datos borrado.")
-    except sqlite3.Error as e:
-        print(f"Error: No se pudo limpiar la base de datos: {e}")
 
 
 # ===== EXCEPCIONES PERSONALIZADAS =====
@@ -219,72 +209,7 @@ def etiqueta_conexion(conexion, dirigido=False):
             f"(peso {formato_numero(conexion['peso'])})")
 
 
-# ===== INPUT: PEDIR NODO =====
-def pedir_nodo(mensaje):
-    """Pide un nodo hasta que sea valido."""
-    while True:
-        try:
-            return validar_nodo(input(mensaje))
-        except NodoInvalidoError as e:
-            print(f"Error: {e}")
-
-
-# ===== INPUT: PEDIR PESO DE LA CONEXION =====
-def pedir_peso():
-    """Pide un peso hasta que sea valido."""
-    while True:
-        try:
-            return validar_peso(input("Peso de la conexion: "))
-        except PesoInvalidoError as e:
-            print(f"Error: {e}")
-
-
-# ===== INPUT: REGISTRO DE CONEXIONES DEL GRAFO =====
-def pedir_conexiones():
-    """Pide las conexiones del grafo y las regresa en una lista."""
-    conexiones = []
-    print("\n===== REGISTRO DE CONEXIONES =====")
-
-    while True:
-        origen = pedir_nodo("Nodo origen: ")
-        destino = pedir_nodo("Nodo destino: ")
-
-        try:
-            validar_conexion(origen, destino)
-        except ConexionInvalidaError as e:
-            print(f"Error: {e}")
-            continue
-
-        peso = pedir_peso()
-        conexiones.append({"origen": origen, "destino": destino, "peso": peso})
-
-        otra = input("¿Agregar otra conexion? (s/n): ").strip().lower()
-        if otra != "s":
-            return conexiones
-
-
-# ===== INPUT: NODO DE INICIO Y DESTINO =====
-def pedir_ruta(nodos):
-    """Pide el nodo de inicio y el de destino, validando que existan."""
-    print(f"\nNodos disponibles: {', '.join(nodos)}")
-
-    while True:
-        inicio = pedir_nodo("Nodo de inicio: ")
-        fin = pedir_nodo("Nodo de destino: ")
-        if inicio in nodos and fin in nodos:
-            return inicio, fin
-        print("Error: Alguno de los nodos no existe en el grafo.")
-
-
-# ===== CSV: GUARDAR CONEXIONES EN Nodos.csv =====
-def guardar_csv(conexiones):
-    """Guarda las conexiones en Nodos.csv (los errores se manejan en main)."""
-    with open(RUTA_CSV, mode="w", newline="", encoding="utf-8") as file:
-        escribir_csv(file, conexiones)
-    print("Conexiones guardadas en Nodos.csv")
-
-
-# ===== CSV: ESCRIBIR CONEXIONES EN UN ARCHIVO O TEXTO =====
+# ===== CSV: ESCRIBIR CONEXIONES EN UN ARCHIVO O TEXTO (EXPORTAR) =====
 def escribir_csv(destino, conexiones, nodos=()):
     """Escribe encabezados y conexiones en un archivo abierto o StringIO.
     Los nodos sin conexiones se guardan como 'A,,' (sin destino ni peso)."""
@@ -303,14 +228,3 @@ def conexiones_a_texto(conexiones, nodos=()):
     salida = io.StringIO()
     escribir_csv(salida, conexiones, nodos)
     return salida.getvalue()
-
-
-# ===== CSV: BORRAR REGISTRO DE Nodos.csv =====
-def limpiar_csv():
-    """Borra el registro de Nodos.csv dejando solo los encabezados."""
-    try:
-        with open(RUTA_CSV, mode="w", newline="", encoding="utf-8") as file:
-            escribir_csv(file, [])
-        print("Registro de Nodos.csv borrado.")
-    except PermissionError:
-        print("Error: No hay permisos para limpiar Nodos.csv")
