@@ -11,6 +11,7 @@ Descripcion: Web app en Streamlit (DIJKSTRA-VISUALIZER) para crear un grafo,
 
 
 import copy
+import sqlite3
 from collections.abc import Callable
 from datetime import datetime
 from typing import Any, TypedDict
@@ -74,18 +75,26 @@ EJEMPLO: list[tuple[str, str, float]] = [
 ss: Any = st.session_state   # variables de la sesion (nodos, aristas, ...)
 
 
-# ===== ALMACEN EN MEMORIA (1 sola lectura de Nodos.csv) =====
+# ===== ALMACEN EN MEMORIA (1 sola lectura de la base de datos) =====
 @st.cache_resource
 def almacen() -> Almacen:
-    """Lee Nodos.csv UNA sola vez mientras el servidor de Streamlit este
-    encendido. El diccionario que regresa queda en memoria y se comparte
-    entre recargas (F5) y pestañas, asi el archivo no se vuelve a abrir."""
+    """Lee la base de datos (grafo.db) UNA sola vez mientras el servidor de
+    Streamlit este encendido. El diccionario que regresa queda en memoria y
+    se comparte entre recargas (F5) y pestañas, asi la base no se vuelve a
+    consultar. Si la base esta vacia, primero migra los datos de
+    Nodos.csv (si existen)."""
     datos: Almacen = {"nodos": [], "aristas": [], "error": None,
                       "sin_guardar": False}
     try:
-        datos["nodos"], datos["aristas"] = db_handler.cargar_grafo_csv()
+        db_handler.migrar_csv_a_db()
     except (ValueError, KeyError, OSError) as e:
-        datos["error"] = f"No se pudo leer Nodos.csv: {e}"
+        datos["error"] = f"No se pudieron migrar los datos de Nodos.csv: {e}"
+    except sqlite3.Error as e:
+        datos["error"] = f"Error en la base de datos: {e}"
+    try:
+        datos["nodos"], datos["aristas"] = db_handler.cargar_grafo_db()
+    except sqlite3.Error as e:
+        datos["error"] = f"No se pudo leer la base de datos: {e}"
     return datos
 
 
@@ -110,17 +119,20 @@ def iniciar_estado() -> None:
             ss[clave] = valor
 
 
-def guardar_en_csv() -> bool:
-    """Escribe el grafo actual en Nodos.csv (solo al presionar el boton
-    'Guardar en Nodos.csv'). Regresa True si se guardo."""
+def guardar_en_db() -> bool:
+    """Escribe el grafo actual en la base de datos (solo al presionar el
+    boton de guardar). Regresa True si se guardo."""
     try:
-        db_handler.guardar_grafo_csv(ss.nodos, ss.aristas)
-    except PermissionError:
-        avisar_error("No se pudo guardar Nodos.csv (¿está abierto en otro "
-                     "programa?).")
+        db_handler.guardar_grafo_db(ss.nodos, ss.aristas)
+    except sqlite3.OperationalError as e:
+        # Ej: base bloqueada por otro programa o sin permisos de escritura
+        avisar_error(f"No se pudo guardar en la base de datos: {e}")
         return False
-    except OSError as e:
-        avisar_error(f"No se pudo guardar Nodos.csv: {e}")
+    except sqlite3.IntegrityError as e:
+        avisar_error(f"El grafo tiene datos inválidos: {e}")
+        return False
+    except sqlite3.Error as e:
+        avisar_error(f"Error en la base de datos: {e}")
         return False
     almacen()["sin_guardar"] = False
     return True
@@ -133,7 +145,7 @@ def grafo_actual() -> Grafo:
 
 def grafo_modificado() -> None:
     """Al cambiar el grafo se actualiza el almacen en memoria (para que
-    sobreviva a una recarga) sin tocar Nodos.csv, y el ultimo resultado
+    sobreviva a una recarga) sin tocar la base de datos, y el ultimo resultado
     deja de ser valido."""
     ss.resultado = None
     datos: Almacen = almacen()
@@ -240,8 +252,8 @@ def cb_importar_csv() -> None:
              icon=":material/check_circle:")
 
 
-def cb_guardar_csv() -> None:
-    if guardar_en_csv():
+def cb_guardar_db() -> None:
+    if guardar_en_db():
         st.toast("Grafo guardado en Nodos.csv.", icon=":material/save:")
 
 
@@ -463,7 +475,7 @@ def seccion_tabla() -> None:
                            file_name="Nodos.csv", mime="text/csv",
                            icon=":material/download:",
                            disabled=not ss.nodos, width="stretch")
-        st.button("Guardar en Nodos.csv", on_click=cb_guardar_csv,
+        st.button("Guardar en Nodos.csv", on_click=cb_guardar_db,
                   type="primary", icon=":material/save:", width="stretch")
         if almacen()["sin_guardar"]:
             st.caption(":orange[Hay cambios sin guardar en Nodos.csv.]")
