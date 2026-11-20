@@ -1,7 +1,7 @@
 """
 Titulo: main
 Nombre Completo: Luis Angel Pardave Garcia
-Fecha de creación: 29/10/2026
+Fecha de creación: 24/11/2026
 Descripcion: Archivo principal. Abre la web app de Streamlit (app.py), que
              es la unica interfaz del programa.
              Ejecutar con:  py main.py

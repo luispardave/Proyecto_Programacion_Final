@@ -1,7 +1,7 @@
 """
 Titulo: grafo
 Nombre Completo: Luis Angel Pardave Garcia
-Fecha de creación: 29/10/2026
+Fecha de creación: 24/11/2026
 Descripcion: Clase Grafo con algoritmo de Dijkstra. Se arma desde las
              listas de nodos y conexiones guardadas en la base de datos
              (ver Grafo.desde_listas y db_handler.cargar_grafo_db)
