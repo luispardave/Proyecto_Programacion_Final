@@ -254,7 +254,8 @@ def cb_importar_csv() -> None:
 
 def cb_guardar_db() -> None:
     if guardar_en_db():
-        st.toast("Grafo guardado en Nodos.csv.", icon=":material/save:")
+        st.toast("Grafo guardado en la base de datos.",
+                 icon=":material/save:")
 
 
 def cb_ejecutar_dijkstra() -> None:
@@ -460,10 +461,11 @@ def seccion_tabla() -> None:
 
     with col_csv:
         st.markdown("**Importar / Exportar CSV**")
-        st.caption(f"Columnas: {', '.join(db_handler.ENCABEZADOS)} (como "
-                   "Nodos.csv). Importar reemplaza el grafo actual. "
-                   "Nodos.csv se lee una sola vez al iniciar la app; los "
-                   "cambios se escriben solo con **Guardar en Nodos.csv**.")
+        st.caption(f"Columnas: {', '.join(db_handler.ENCABEZADOS)}. "
+                   "Importar reemplaza el grafo actual. "
+                   "La base de datos se lee una sola vez al iniciar la app; "
+                   "los cambios se escriben solo con **Guardar en la base "
+                   "de datos**.")
         st.file_uploader("Archivo CSV", type="csv", key="csv_subido",
                          label_visibility="collapsed")
         c1, c2 = st.columns(2)
@@ -472,13 +474,14 @@ def seccion_tabla() -> None:
         c2.download_button("Exportar",
                            db_handler.conexiones_a_texto(ss.aristas,
                                                          ss.nodos),
-                           file_name="Nodos.csv", mime="text/csv",
+                           file_name="grafo.csv", mime="text/csv",
                            icon=":material/download:",
                            disabled=not ss.nodos, width="stretch")
-        st.button("Guardar en Nodos.csv", on_click=cb_guardar_db,
+        st.button("Guardar en la base de datos", on_click=cb_guardar_db,
                   type="primary", icon=":material/save:", width="stretch")
         if almacen()["sin_guardar"]:
-            st.caption(":orange[Hay cambios sin guardar en Nodos.csv.]")
+            st.caption(":orange[Hay cambios sin guardar en la base de "
+                       "datos.]")
 
 
 # ===== SECCION 3: EJECUTAR DIJKSTRA =====
