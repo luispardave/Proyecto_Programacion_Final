@@ -10,10 +10,54 @@ Descripcion: Recaba y valida los inputs del usuario, maneja la lista de
 import csv
 import io
 import os
+import sqlite3
 
 # ===== CONFIGURACION DEL ARCHIVO CSV =====
 RUTA_CSV = os.path.join(os.path.dirname(__file__), "Nodos.csv")
 ENCABEZADOS = ["origen", "destino", "peso"]
+
+# ===== CONFIGURACION DE LA BASE DE DATOS SQLITE =====
+RUTA_DB = os.path.join(os.path.dirname(__file__), "grafo.db")
+
+# Tabla nodos: cada nodo es una sola letra y no se repite.
+# Tabla conexiones: cada conexion une dos nodos existentes, con peso > 0.
+# ON DELETE CASCADE: si se borra un nodo, se borran sus conexiones.
+ESQUEMA = """
+CREATE TABLE IF NOT EXISTS nodos (
+    nombre  TEXT PRIMARY KEY CHECK (length(nombre) = 1)
+);
+
+CREATE TABLE IF NOT EXISTS conexiones (
+    id       INTEGER PRIMARY KEY AUTOINCREMENT,
+    origen   TEXT NOT NULL REFERENCES nodos(nombre) ON DELETE CASCADE,
+    destino  TEXT NOT NULL REFERENCES nodos(nombre) ON DELETE CASCADE,
+    peso     REAL NOT NULL CHECK (peso > 0),
+    UNIQUE (origen, destino),
+    CHECK (origen <> destino)
+);
+"""
+
+
+# ===== DB: ABRIR CONEXION =====
+def conectar(ruta=None):
+    """Abre la base de datos (la crea si no existe) con las llaves foraneas
+    activadas. Las filas se pueden leer como diccionario: fila["peso"]."""
+    conexion = sqlite3.connect(ruta or RUTA_DB)
+    # SQLite trae las llaves foraneas apagadas por defecto
+    conexion.execute("PRAGMA foreign_keys = ON")
+    conexion.row_factory = sqlite3.Row
+    return conexion
+
+
+# ===== DB: CREAR TABLAS =====
+def crear_tablas(ruta=None):
+    """Crea las tablas nodos y conexiones si todavia no existen."""
+    conexion = conectar(ruta)
+    try:
+        with conexion:   # hace commit al terminar (o rollback si falla)
+            conexion.executescript(ESQUEMA)
+    finally:
+        conexion.close()
 
 
 # ===== EXCEPCIONES PERSONALIZADAS =====
