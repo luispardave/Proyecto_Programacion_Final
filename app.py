@@ -1,7 +1,7 @@
 """
 Titulo: app
 Nombre Completo: Luis Angel Pardave Garcia
-Fecha de creación: 05/11/2026
+Fecha de creación: 24/11/2026
 Descripcion: Web app en Streamlit (DIJKSTRA-VISUALIZER) para crear un grafo,
              verlo en un lienzo y ejecutar Dijkstra de forma visual.
              El grafo se guarda en la base de datos SQLite (grafo.db).

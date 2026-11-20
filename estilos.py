@@ -1,7 +1,7 @@
 """
 Titulo: estilos
 Nombre Completo: Luis Angel Pardave Garcia
-Fecha de creación: 05/11/2026
+Fecha de creación: 24/11/2026
 Descripcion: Tematica medieval / ajedrez de la web app: paletas de color
              (Dia = pergamino, Noche = castillo), CSS y acomodo visual de
              los nodos en el lienzo

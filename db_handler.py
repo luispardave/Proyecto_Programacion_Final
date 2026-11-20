@@ -1,7 +1,7 @@
 """
 Titulo: db_handler
 Nombre Completo: Luis Angel Pardave Garcia
-Fecha de creación: 29/10/2026
+Fecha de creación: 24/11/2026
 Descripcion: Valida los datos del usuario, maneja la lista de conexiones,
              guarda/carga el grafo en la base de datos SQLite (grafo.db) y
              lo exporta a texto CSV
