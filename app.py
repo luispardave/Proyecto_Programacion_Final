@@ -81,16 +81,9 @@ def almacen() -> Almacen:
     """Lee la base de datos (grafo.db) UNA sola vez mientras el servidor de
     Streamlit este encendido. El diccionario que regresa queda en memoria y
     se comparte entre recargas (F5) y pestañas, asi la base no se vuelve a
-    consultar. Si la base esta vacia, primero migra los datos de
-    Nodos.csv (si existen)."""
+    consultar."""
     datos: Almacen = {"nodos": [], "aristas": [], "error": None,
                       "sin_guardar": False}
-    try:
-        db_handler.migrar_csv_a_db()
-    except (ValueError, KeyError, OSError) as e:
-        datos["error"] = f"No se pudieron migrar los datos de Nodos.csv: {e}"
-    except sqlite3.Error as e:
-        datos["error"] = f"Error en la base de datos: {e}"
     try:
         datos["nodos"], datos["aristas"] = db_handler.cargar_grafo_db()
     except sqlite3.Error as e:
@@ -136,6 +129,18 @@ def guardar_en_db() -> bool:
         return False
     almacen()["sin_guardar"] = False
     return True
+
+
+def csv_guardado() -> str | None:
+    """Regresa como texto CSV el grafo guardado en la base de datos, o None
+    si la base esta vacia o no se pudo leer."""
+    try:
+        nodos, aristas = db_handler.cargar_grafo_db()
+    except sqlite3.Error:
+        return None
+    if not nodos:
+        return None
+    return db_handler.conexiones_a_texto(aristas, nodos)
 
 
 def grafo_actual() -> Grafo:
@@ -228,28 +233,6 @@ def cb_limpiar_grafo() -> None:
     ss.nodos = []
     ss.aristas = []
     grafo_modificado()
-
-
-def cb_importar_csv() -> None:
-    archivo = ss.get("csv_subido")   # UploadedFile | None
-    if archivo is None:
-        st.toast("Primero selecciona un archivo CSV.", icon=":material/info:")
-        return
-    try:
-        texto: str = archivo.getvalue().decode("utf-8-sig")
-        nodos: list[str]
-        aristas: list[Arista]
-        nodos, aristas = db_handler.leer_conexiones_texto(texto)
-    except KeyError as e:
-        avisar_error(f"Falta la columna {e} en el CSV.")
-        return
-    except (ValueError, UnicodeDecodeError) as e:
-        avisar_error(f"CSV inválido: {e}")
-        return
-    ss.nodos, ss.aristas = nodos, aristas
-    grafo_modificado()
-    st.toast(f"Se cargaron {len(aristas)} conexiones.",
-             icon=":material/check_circle:")
 
 
 def cb_guardar_db() -> None:
@@ -432,11 +415,10 @@ def seccion_tabla() -> None:
         else:
             st.caption("Todavía no hay conexiones.")
     else:
-        st.info("El grafo está vacío. Ve a **1. Crear Grafo** o importa un "
-                "CSV.")
+        st.info("El grafo está vacío. Ve a **1. Crear Grafo**.")
 
     st.divider()
-    col_editar, col_csv = st.columns(2, gap="large")
+    col_editar, col_db = st.columns(2, gap="large")
 
     with col_editar:
         st.markdown("**Eliminar elementos**")
@@ -459,29 +441,28 @@ def seccion_tabla() -> None:
         else:
             st.caption("No hay nada que eliminar.")
 
-    with col_csv:
-        st.markdown("**Importar / Exportar CSV**")
-        st.caption(f"Columnas: {', '.join(db_handler.ENCABEZADOS)}. "
-                   "Importar reemplaza el grafo actual. "
-                   "La base de datos se lee una sola vez al iniciar la app; "
+    with col_db:
+        st.markdown("**Base de datos**")
+        st.caption("La base de datos se lee una sola vez al iniciar la app; "
                    "los cambios se escriben solo con **Guardar en la base "
                    "de datos**.")
-        st.file_uploader("Archivo CSV", type="csv", key="csv_subido",
-                         label_visibility="collapsed")
-        c1, c2 = st.columns(2)
-        c1.button("Importar", on_click=cb_importar_csv,
-                  icon=":material/upload:", width="stretch")
-        c2.download_button("Exportar",
-                           db_handler.conexiones_a_texto(ss.aristas,
-                                                         ss.nodos),
-                           file_name="grafo.csv", mime="text/csv",
-                           icon=":material/download:",
-                           disabled=not ss.nodos, width="stretch")
         st.button("Guardar en la base de datos", on_click=cb_guardar_db,
                   type="primary", icon=":material/save:", width="stretch")
-        if almacen()["sin_guardar"]:
+        sin_guardar: bool = almacen()["sin_guardar"]
+        if sin_guardar:
             st.caption(":orange[Hay cambios sin guardar en la base de "
                        "datos.]")
+
+        st.markdown("**Exportar a CSV**")
+        texto_csv: str | None = csv_guardado()
+        st.caption(f"Descarga el grafo **guardado en la base de datos** "
+                   f"(columnas: {', '.join(db_handler.ENCABEZADOS)})."
+                   + (" Los cambios sin guardar no se incluyen."
+                      if sin_guardar else ""))
+        st.download_button("Exportar", texto_csv or "",
+                           file_name="grafo.csv", mime="text/csv",
+                           icon=":material/download:",
+                           disabled=not texto_csv, width="stretch")
 
 
 # ===== SECCION 3: EJECUTAR DIJKSTRA =====

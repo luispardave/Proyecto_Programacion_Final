@@ -122,21 +122,6 @@ def limpiar_db(ruta=None):
         print(f"Error: No se pudo limpiar la base de datos: {e}")
 
 
-# ===== DB: MIGRAR DATOS DE Nodos.csv A LA BASE =====
-def migrar_csv_a_db(ruta_csv=None, ruta_db=None):
-    """Pasa el grafo de Nodos.csv a la base de datos UNA sola vez: solo si
-    la base esta vacia y el CSV tiene datos. Regresa True si migro.
-    Puede lanzar ValueError/KeyError (CSV invalido) o sqlite3.Error."""
-    nodos_db, _ = cargar_grafo_db(ruta_db)
-    if nodos_db:
-        return False   # la base ya tiene un grafo, no se sobrescribe
-    nodos, conexiones = cargar_grafo_csv(ruta_csv)
-    if not nodos:
-        return False   # no hay CSV o esta vacio
-    guardar_grafo_db(nodos, conexiones, ruta_db)
-    return True
-
-
 # ===== EXCEPCIONES PERSONALIZADAS =====
 class NodoInvalidoError(Exception):
     """Se lanza cuando el nodo no es una sola letra."""
@@ -318,53 +303,6 @@ def conexiones_a_texto(conexiones, nodos=()):
     salida = io.StringIO()
     escribir_csv(salida, conexiones, nodos)
     return salida.getvalue()
-
-
-# ===== CSV: PERSISTENCIA DEL GRAFO DE LA WEB APP =====
-def guardar_grafo_csv(nodos, conexiones, ruta=None):
-    """Guarda todo el grafo (conexiones y nodos sueltos) en Nodos.csv."""
-    ruta = ruta or RUTA_CSV
-    with open(ruta, mode="w", newline="", encoding="utf-8") as file:
-        escribir_csv(file, conexiones, nodos)
-
-
-def cargar_grafo_csv(ruta=None):
-    """Lee Nodos.csv y regresa (nodos, conexiones). Si el archivo no
-    existe regresa listas vacias; si tiene datos invalidos lanza
-    ValueError o KeyError (ver leer_conexiones_texto)."""
-    ruta = ruta or RUTA_CSV
-    if not os.path.exists(ruta):
-        return [], []
-    with open(ruta, mode="r", encoding="utf-8-sig") as file:
-        return leer_conexiones_texto(file.read())
-
-
-# ===== CSV: LEER Y VALIDAR CONEXIONES DESDE TEXTO =====
-def leer_conexiones_texto(texto):
-    """Lee un CSV (origen,destino,peso) y regresa (nodos, conexiones).
-    Una fila sin destino ni peso es un nodo sin conexiones.
-    Lanza KeyError si falta una columna o ValueError si una fila es
-    invalida."""
-    nodos = set()
-    conexiones = []
-    reader = csv.DictReader(io.StringIO(texto))
-    for num, row in enumerate(reader, start=2):
-        try:
-            origen = validar_nodo(row["origen"] or "")
-            if not (row["destino"] or "").strip() and \
-                    not (row["peso"] or "").strip():
-                nodos.add(origen)
-                continue
-            destino = validar_nodo(row["destino"])
-            validar_conexion(origen, destino)
-            peso = validar_peso(row["peso"])
-        except (NodoInvalidoError, PesoInvalidoError,
-                ConexionInvalidaError) as e:
-            raise ValueError(f"fila {num}: {e}")
-        nodos.update([origen, destino])
-        conexiones.append({"origen": origen, "destino": destino,
-                           "peso": peso})
-    return sorted(nodos), conexiones
 
 
 # ===== CSV: BORRAR REGISTRO DE Nodos.csv =====
