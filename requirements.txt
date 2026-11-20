@@ -1,2 +1,24 @@
-streamlit>=1.40
-pandas>=2.0
+# ===== DIJKSTRA-VISUALIZER: DEPENDENCIAS =====
+# Instalar con:  py -m pip install -r requirements.txt
+# Python usado: 3.13.7
+
+# ----- Librerias externas (se instalan con pip) -----
+streamlit==1.66.1      # app.py: interfaz web
+pandas==3.0.2          # app.py: tablas de la matriz y el historial
+
+# ----- Librerias estandar de Python 3.13.7 (ya vienen incluidas) -----
+# Van como comentario: pip no puede instalarlas y fallaria si no lo fueran.
+# sqlite3              # db_handler.py, app.py: base de datos (SQLite 3.50.4)
+# csv                  # db_handler.py: exportar el grafo a CSV
+# io                   # db_handler.py: armar el CSV como texto (StringIO)
+# os                   # db_handler.py, main.py: rutas de archivos
+# copy                 # app.py: copiar el grafo a la sesion (deepcopy)
+# collections.abc      # app.py: tipo Callable
+# datetime             # app.py: hora de cada recorrido del historial
+# typing               # app.py: tipos Any y TypedDict
+# json                 # estilos.py: pasar nodos y aristas al lienzo
+# math                 # estilos.py: acomodo de los nodos en circulo
+# string               # estilos.py: plantillas de CSS y HTML (Template)
+# importlib            # main.py: revisar que Streamlit este instalado
+# subprocess           # main.py: abrir la app de Streamlit
+# sys                  # main.py: Python actual (sys.executable)
