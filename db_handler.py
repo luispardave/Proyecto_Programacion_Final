@@ -60,6 +60,58 @@ def crear_tablas(ruta=None):
         conexion.close()
 
 
+# ===== DB: GUARDAR EL GRAFO COMPLETO =====
+def guardar_grafo_db(nodos, conexiones, ruta=None):
+    """Reemplaza el grafo guardado por el actual (nodos sueltos incluidos).
+    Todo ocurre en una sola transaccion: si algo falla no se borra nada.
+    Los errores (sqlite3.Error) se manejan en quien la llama."""
+    crear_tablas(ruta)
+    # Tambien se guardan los nodos que solo aparecen en las conexiones
+    todos = set(nodos)
+    for c in conexiones:
+        todos.update([c["origen"], c["destino"]])
+
+    conexion = conectar(ruta)
+    try:
+        with conexion:
+            # Se borran primero las conexiones por la llave foranea
+            conexion.execute("DELETE FROM conexiones")
+            conexion.execute("DELETE FROM nodos")
+            conexion.executemany(
+                "INSERT INTO nodos (nombre) VALUES (?)",
+                [(nombre,) for nombre in sorted(todos)])
+            conexion.executemany(
+                "INSERT INTO conexiones (origen, destino, peso) "
+                "VALUES (?, ?, ?)",
+                [(c["origen"], c["destino"], c["peso"]) for c in conexiones])
+    finally:
+        conexion.close()
+
+
+# ===== DB: CARGAR EL GRAFO COMPLETO =====
+def cargar_grafo_db(ruta=None):
+    """Lee la base de datos y regresa (nodos, conexiones) con el mismo
+    formato que usaba el CSV. Si la base no existe la crea vacia."""
+    crear_tablas(ruta)
+    conexion = conectar(ruta)
+    try:
+        nodos = [fila["nombre"] for fila in conexion.execute(
+            "SELECT nombre FROM nodos ORDER BY nombre")]
+        conexiones = []
+        # ORDER BY id respeta el orden en que se agregaron
+        for fila in conexion.execute(
+                "SELECT origen, destino, peso FROM conexiones ORDER BY id"):
+            peso = fila["peso"]
+            # SQLite guarda el peso como REAL: 4.0 se regresa como 4
+            if float(peso).is_integer():
+                peso = int(peso)
+            conexiones.append({"origen": fila["origen"],
+                               "destino": fila["destino"], "peso": peso})
+    finally:
+        conexion.close()
+    return nodos, conexiones
+
+
 # ===== EXCEPCIONES PERSONALIZADAS =====
 class NodoInvalidoError(Exception):
     """Se lanza cuando el nodo no es una sola letra."""
