@@ -4,7 +4,7 @@ Nombre Completo: Luis Angel Pardave Garcia
 Fecha de creación: 05/11/2026
 Descripcion: Web app en Streamlit (DIJKSTRA-VISUALIZER) para crear un grafo,
              verlo en un lienzo y ejecutar Dijkstra de forma visual.
-             La logica vive en grafo.py, io_handler.py y estilos.py;
+             La logica vive en grafo.py, db_handler.py y estilos.py;
              este archivo solo arma la interfaz.
              Ejecutar con:  streamlit run app.py
 """
@@ -19,9 +19,9 @@ import pandas as pd
 import streamlit as st
 
 import estilos
-import io_handler
+import db_handler
 from grafo import Grafo
-from io_handler import formato_numero
+from db_handler import formato_numero
 
 
 # ===== TIPOS DE DATOS =====
@@ -83,7 +83,7 @@ def almacen() -> Almacen:
     datos: Almacen = {"nodos": [], "aristas": [], "error": None,
                       "sin_guardar": False}
     try:
-        datos["nodos"], datos["aristas"] = io_handler.cargar_grafo_csv()
+        datos["nodos"], datos["aristas"] = db_handler.cargar_grafo_csv()
     except (ValueError, KeyError, OSError) as e:
         datos["error"] = f"No se pudo leer Nodos.csv: {e}"
     return datos
@@ -114,7 +114,7 @@ def guardar_en_csv() -> bool:
     """Escribe el grafo actual en Nodos.csv (solo al presionar el boton
     'Guardar en Nodos.csv'). Regresa True si se guardo."""
     try:
-        io_handler.guardar_grafo_csv(ss.nodos, ss.aristas)
+        db_handler.guardar_grafo_csv(ss.nodos, ss.aristas)
     except PermissionError:
         avisar_error("No se pudo guardar Nodos.csv (¿está abierto en otro "
                      "programa?).")
@@ -155,8 +155,8 @@ def flecha() -> str:
 # ===== CALLBACKS (se ejecutan antes de redibujar la pagina) =====
 def cb_agregar_nodo() -> None:
     try:
-        nombre: str = io_handler.validar_nodo(ss.nuevo_nodo)
-    except io_handler.NodoInvalidoError as e:
+        nombre: str = db_handler.validar_nodo(ss.nuevo_nodo)
+    except db_handler.NodoInvalidoError as e:
         avisar_error(e)
         return
     if nombre in ss.nodos:
@@ -171,11 +171,11 @@ def cb_agregar_arista() -> None:
     origen: str = ss.arista_origen
     destino: str = ss.arista_destino
     try:
-        peso: float = io_handler.validar_peso(ss.arista_peso)
-        nueva: bool = io_handler.agregar_conexion(ss.aristas, origen,
+        peso: float = db_handler.validar_peso(ss.arista_peso)
+        nueva: bool = db_handler.agregar_conexion(ss.aristas, origen,
                                                   destino, peso, ss.dirigido)
-    except (io_handler.PesoInvalidoError,
-            io_handler.ConexionInvalidaError) as e:
+    except (db_handler.PesoInvalidoError,
+            db_handler.ConexionInvalidaError) as e:
         avisar_error(e)
         return
     texto: str = f"{origen}{flecha()}{destino}"
@@ -190,7 +190,7 @@ def cb_agregar_arista() -> None:
 def cb_eliminar_nodo() -> None:
     nombre: str = ss.nodo_a_borrar
     ss.nodos.remove(nombre)
-    ss.aristas = io_handler.quitar_nodo(ss.aristas, nombre)
+    ss.aristas = db_handler.quitar_nodo(ss.aristas, nombre)
     grafo_modificado()
     st.toast(f"Nodo {nombre} y sus conexiones eliminados.",
              icon=":material/delete:")
@@ -199,7 +199,7 @@ def cb_eliminar_nodo() -> None:
 def cb_eliminar_arista() -> None:
     elegida: str = ss.arista_a_borrar
     ss.aristas = [a for a in ss.aristas
-                  if io_handler.etiqueta_conexion(a, ss.dirigido) != elegida]
+                  if db_handler.etiqueta_conexion(a, ss.dirigido) != elegida]
     grafo_modificado()
     st.toast("Conexión eliminada.", icon=":material/delete:")
 
@@ -227,7 +227,7 @@ def cb_importar_csv() -> None:
         texto: str = archivo.getvalue().decode("utf-8-sig")
         nodos: list[str]
         aristas: list[Arista]
-        nodos, aristas = io_handler.leer_conexiones_texto(texto)
+        nodos, aristas = db_handler.leer_conexiones_texto(texto)
     except KeyError as e:
         avisar_error(f"Falta la columna {e} en el CSV.")
         return
@@ -435,7 +435,7 @@ def seccion_tabla() -> None:
         if ss.aristas:
             c1, c2 = st.columns([2, 1], vertical_alignment="bottom")
             c1.selectbox("Conexión",
-                         [io_handler.etiqueta_conexion(a, ss.dirigido)
+                         [db_handler.etiqueta_conexion(a, ss.dirigido)
                           for a in ss.aristas],
                          key="arista_a_borrar")
             c2.button("Eliminar conexión", on_click=cb_eliminar_arista,
@@ -448,7 +448,7 @@ def seccion_tabla() -> None:
 
     with col_csv:
         st.markdown("**Importar / Exportar CSV**")
-        st.caption(f"Columnas: {', '.join(io_handler.ENCABEZADOS)} (como "
+        st.caption(f"Columnas: {', '.join(db_handler.ENCABEZADOS)} (como "
                    "Nodos.csv). Importar reemplaza el grafo actual. "
                    "Nodos.csv se lee una sola vez al iniciar la app; los "
                    "cambios se escriben solo con **Guardar en Nodos.csv**.")
@@ -458,7 +458,7 @@ def seccion_tabla() -> None:
         c1.button("Importar", on_click=cb_importar_csv,
                   icon=":material/upload:", width="stretch")
         c2.download_button("Exportar",
-                           io_handler.conexiones_a_texto(ss.aristas,
+                           db_handler.conexiones_a_texto(ss.aristas,
                                                          ss.nodos),
                            file_name="Nodos.csv", mime="text/csv",
                            icon=":material/download:",

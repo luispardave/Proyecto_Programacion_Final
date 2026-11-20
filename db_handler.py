@@ -1,5 +1,5 @@
 """
-Titulo: io_handler
+Titulo: db_handler
 Nombre Completo: Luis Angel Pardave Garcia
 Fecha de creación: 29/10/2026
 Descripcion: Recaba y valida los inputs del usuario, maneja la lista de
