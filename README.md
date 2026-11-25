@@ -38,25 +38,32 @@ que instalar nada extra.
 
 ```sql
 CREATE TABLE nodos (
-    nombre  TEXT PRIMARY KEY CHECK (length(nombre) = 1)
+    id      INTEGER PRIMARY KEY,
+    nombre  TEXT NOT NULL UNIQUE CHECK (length(nombre) = 1)
 );
 
 CREATE TABLE conexiones (
-    id       INTEGER PRIMARY KEY AUTOINCREMENT,
-    origen   TEXT NOT NULL REFERENCES nodos(nombre) ON DELETE CASCADE,
-    destino  TEXT NOT NULL REFERENCES nodos(nombre) ON DELETE CASCADE,
-    peso     REAL NOT NULL CHECK (peso > 0),
-    UNIQUE (origen, destino),
-    CHECK (origen <> destino)
+    id          INTEGER PRIMARY KEY,
+    origen_id   INTEGER NOT NULL REFERENCES nodos(id) ON DELETE CASCADE,
+    destino_id  INTEGER NOT NULL REFERENCES nodos(id) ON DELETE CASCADE,
+    peso        REAL NOT NULL CHECK (peso > 0),
+    UNIQUE (origen_id, destino_id),
+    CHECK (origen_id <> destino_id)
 );
 ```
 
 | Regla | Qué evita |
 |---|---|
-| `PRIMARY KEY` en `nodos` | nodos repetidos |
-| `REFERENCES ... ON DELETE CASCADE` | conexiones hacia nodos que no existen; al borrar un nodo se borran sus conexiones |
-| `UNIQUE (origen, destino)` | la misma conexión dos veces |
+| `PRIMARY KEY` (`id`) en ambas tablas | filas sin identificador único |
+| `UNIQUE` en `nodos.nombre` | nodos repetidos |
+| `REFERENCES nodos(id) ... ON DELETE CASCADE` | conexiones hacia nodos que no existen; al borrar un nodo se borran sus conexiones |
+| `UNIQUE (origen_id, destino_id)` | la misma conexión dos veces |
 | `CHECK` | pesos ≤ 0, nodos de más de una letra y conexiones de un nodo consigo mismo |
+
+Al leer, las conexiones se unen con `nodos` (`JOIN`) para cambiar cada id
+por el nombre del nodo. Si se abre una `grafo.db` con el esquema anterior
+(nodos con `nombre` como PK), se convierte sola al esquema nuevo sin perder
+datos.
 
 ## Exportar a CSV
 
@@ -81,3 +88,38 @@ Una fila sin destino ni peso (`Z,,`) es un nodo sin conexiones.
 | `grafo.py` | Clases `Nodo` y `Grafo`, algoritmo de Dijkstra |
 | `db_handler.py` | Validaciones, base de datos SQLite y exportación CSV |
 | `estilos.py` | Temas de color, CSS y acomodo de los nodos en el lienzo |
+
+## Tipos de datos (type hints)
+
+Como buena práctica, todas las funciones indican el tipo de cada parámetro
+y, después de `->`, el tipo de dato que regresan:
+
+```python
+def validar_peso(texto: str) -> int | float:
+def cargar_grafo_db(ruta: str | None = None
+                    ) -> tuple[list[str], list[Conexion]]:
+def dijkstra(self, inicio: str, destino: str) -> tuple[float, list[str]]:
+def main() -> None:          # None: la función no regresa nada
+```
+
+| Notación | Significado |
+|---|---|
+| `-> str` | regresa un texto |
+| `-> int \| float` | regresa un número entero o decimal |
+| `-> bool` | regresa `True` o `False` |
+| `-> None` | no regresa nada |
+| `str \| None` | un texto o `None` (valor opcional) |
+| `list[str]` | lista de textos, ej. `["A", "B"]` |
+| `dict[str, float]` | diccionario de texto a número, ej. `{"A": 4}` |
+| `tuple[float, list[str]]` | par de valores, ej. `(9, ["A", "B", "E"])` |
+
+Tipos propios del proyecto:
+
+| Tipo | Dónde | Qué representa |
+|---|---|---|
+| `Conexion` | `db_handler.py` | una conexión: `{"origen": "A", "destino": "B", "peso": 4}` |
+| `Arista`, `Resultado`, `Almacen` | `app.py` | conexión, resultado de Dijkstra y datos en memoria (`TypedDict`) |
+
+Los tipos solo documentan el código: Python no los revisa al ejecutar, así
+que no cambian el funcionamiento. La notación `X | Y` requiere Python 3.10
+o superior (el proyecto usa 3.13.7).

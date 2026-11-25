@@ -12,34 +12,42 @@ import csv
 import io
 import os
 import sqlite3
+from collections.abc import Iterable
+from typing import TextIO
 
 # ===== CONFIGURACION DE LA EXPORTACION CSV =====
-ENCABEZADOS = ["origen", "destino", "peso"]
+ENCABEZADOS: list[str] = ["origen", "destino", "peso"]
+
+# Una conexion del grafo: {"origen": "A", "destino": "B", "peso": 4}
+Conexion = dict[str, str | float]
 
 # ===== CONFIGURACION DE LA BASE DE DATOS SQLITE =====
-RUTA_DB = os.path.join(os.path.dirname(__file__), "grafo.db")
+RUTA_DB: str = os.path.join(os.path.dirname(__file__), "grafo.db")
 
-# Tabla nodos: cada nodo es una sola letra y no se repite.
-# Tabla conexiones: cada conexion une dos nodos existentes, con peso > 0.
+# Tabla nodos: cada nodo tiene un id (PK) y un nombre de una sola letra
+#              que no se repite (UNIQUE).
+# Tabla conexiones: cada conexion une dos nodos existentes por su id
+#                   (llaves foraneas origen_id y destino_id), con peso > 0.
 # ON DELETE CASCADE: si se borra un nodo, se borran sus conexiones.
 ESQUEMA = """
 CREATE TABLE IF NOT EXISTS nodos (
-    nombre  TEXT PRIMARY KEY CHECK (length(nombre) = 1)
+    id      INTEGER PRIMARY KEY,
+    nombre  TEXT NOT NULL UNIQUE CHECK (length(nombre) = 1)
 );
 
 CREATE TABLE IF NOT EXISTS conexiones (
-    id       INTEGER PRIMARY KEY AUTOINCREMENT,
-    origen   TEXT NOT NULL REFERENCES nodos(nombre) ON DELETE CASCADE,
-    destino  TEXT NOT NULL REFERENCES nodos(nombre) ON DELETE CASCADE,
-    peso     REAL NOT NULL CHECK (peso > 0),
-    UNIQUE (origen, destino),
-    CHECK (origen <> destino)
+    id          INTEGER PRIMARY KEY,
+    origen_id   INTEGER NOT NULL REFERENCES nodos(id) ON DELETE CASCADE,
+    destino_id  INTEGER NOT NULL REFERENCES nodos(id) ON DELETE CASCADE,
+    peso        REAL NOT NULL CHECK (peso > 0),
+    UNIQUE (origen_id, destino_id),
+    CHECK (origen_id <> destino_id)
 );
 """
 
 
 # ===== DB: ABRIR CONEXION =====
-def conectar(ruta=None):
+def conectar(ruta: str | None = None) -> sqlite3.Connection:
     """Abre la base de datos (la crea si no existe) con las llaves foraneas
     activadas. Las filas se pueden leer como diccionario: fila["peso"]."""
     conexion = sqlite3.connect(ruta or RUTA_DB)
@@ -50,18 +58,62 @@ def conectar(ruta=None):
 
 
 # ===== DB: CREAR TABLAS =====
-def crear_tablas(ruta=None):
-    """Crea las tablas nodos y conexiones si todavia no existen."""
+def crear_tablas(ruta: str | None = None) -> None:
+    """Crea las tablas nodos y conexiones si todavia no existen.
+    Si encuentra el esquema viejo (nodos sin columna id) lo convierte al
+    nuevo sin perder los datos guardados."""
     conexion = conectar(ruta)
     try:
+        columnas = [fila["name"] for fila in
+                    conexion.execute("PRAGMA table_info(nodos)")]
+        if columnas and "id" not in columnas:
+            _migrar_esquema_viejo(conexion)
         with conexion:   # hace commit al terminar (o rollback si falla)
             conexion.executescript(ESQUEMA)
     finally:
         conexion.close()
 
 
+# ===== DB: MIGRAR DEL ESQUEMA VIEJO (PK = nombre) AL NUEVO (PK = id) =====
+def _migrar_esquema_viejo(conexion: sqlite3.Connection) -> None:
+    """Lee los datos del esquema viejo, borra las tablas viejas, crea las
+    nuevas y vuelve a insertar los datos, todo en una sola transaccion."""
+    nodos = [fila["nombre"] for fila in conexion.execute(
+        "SELECT nombre FROM nodos ORDER BY nombre")]
+    conexiones = [dict(fila) for fila in conexion.execute(
+        "SELECT origen, destino, peso FROM conexiones ORDER BY id")]
+    with conexion:
+        # BEGIN explicito: sqlite3 no abre transaccion solo para DROP/CREATE
+        conexion.execute("BEGIN")
+        conexion.execute("DROP TABLE conexiones")
+        conexion.execute("DROP TABLE nodos")
+        for sentencia in ESQUEMA.split(";"):
+            if sentencia.strip():
+                conexion.execute(sentencia)
+        _insertar_grafo(conexion, nodos, conexiones)
+
+
+# ===== DB: INSERTAR NODOS Y CONEXIONES (USO INTERNO) =====
+def _insertar_grafo(conexion: sqlite3.Connection, nodos: Iterable[str],
+                    conexiones: list[Conexion]) -> None:
+    """Inserta los nodos, obtiene el id de cada uno y con esos ids inserta
+    las conexiones. No hace commit: lo hace quien la llama."""
+    conexion.executemany(
+        "INSERT INTO nodos (nombre) VALUES (?)",
+        [(nombre,) for nombre in sorted(nodos)])
+    # Diccionario nombre -> id para armar las llaves foraneas
+    ids = {fila["nombre"]: fila["id"] for fila in
+           conexion.execute("SELECT id, nombre FROM nodos")}
+    conexion.executemany(
+        "INSERT INTO conexiones (origen_id, destino_id, peso) "
+        "VALUES (?, ?, ?)",
+        [(ids[c["origen"]], ids[c["destino"]], c["peso"])
+         for c in conexiones])
+
+
 # ===== DB: GUARDAR EL GRAFO COMPLETO =====
-def guardar_grafo_db(nodos, conexiones, ruta=None):
+def guardar_grafo_db(nodos: Iterable[str], conexiones: list[Conexion],
+                     ruta: str | None = None) -> None:
     """Reemplaza el grafo guardado por el actual (nodos sueltos incluidos).
     Todo ocurre en una sola transaccion: si algo falla no se borra nada.
     Los errores (sqlite3.Error) se manejan en quien la llama."""
@@ -77,19 +129,14 @@ def guardar_grafo_db(nodos, conexiones, ruta=None):
             # Se borran primero las conexiones por la llave foranea
             conexion.execute("DELETE FROM conexiones")
             conexion.execute("DELETE FROM nodos")
-            conexion.executemany(
-                "INSERT INTO nodos (nombre) VALUES (?)",
-                [(nombre,) for nombre in sorted(todos)])
-            conexion.executemany(
-                "INSERT INTO conexiones (origen, destino, peso) "
-                "VALUES (?, ?, ?)",
-                [(c["origen"], c["destino"], c["peso"]) for c in conexiones])
+            _insertar_grafo(conexion, todos, conexiones)
     finally:
         conexion.close()
 
 
 # ===== DB: CARGAR EL GRAFO COMPLETO =====
-def cargar_grafo_db(ruta=None):
+def cargar_grafo_db(ruta: str | None = None
+                    ) -> tuple[list[str], list[Conexion]]:
     """Lee la base de datos y regresa (nodos, conexiones) con el mismo
     formato que usaba el CSV. Si la base no existe la crea vacia."""
     crear_tablas(ruta)
@@ -98,9 +145,14 @@ def cargar_grafo_db(ruta=None):
         nodos = [fila["nombre"] for fila in conexion.execute(
             "SELECT nombre FROM nodos ORDER BY nombre")]
         conexiones = []
-        # ORDER BY id respeta el orden en que se agregaron
+        # JOIN con nodos (dos veces) para cambiar cada id por su nombre.
+        # ORDER BY c.id respeta el orden en que se agregaron.
         for fila in conexion.execute(
-                "SELECT origen, destino, peso FROM conexiones ORDER BY id"):
+                "SELECT o.nombre AS origen, d.nombre AS destino, c.peso "
+                "FROM conexiones AS c "
+                "JOIN nodos AS o ON o.id = c.origen_id "
+                "JOIN nodos AS d ON d.id = c.destino_id "
+                "ORDER BY c.id"):
             peso = fila["peso"]
             # SQLite guarda el peso como REAL: 4.0 se regresa como 4
             if float(peso).is_integer():
@@ -129,7 +181,7 @@ class ConexionInvalidaError(Exception):
 
 
 # ===== VALIDACION: NODO DE UNA SOLA LETRA =====
-def validar_nodo(texto):
+def validar_nodo(texto: str) -> str:
     """Regresa el nodo en mayuscula o lanza NodoInvalidoError."""
     texto = texto.strip().upper()
     if len(texto) != 1 or not texto.isalpha():
@@ -138,7 +190,7 @@ def validar_nodo(texto):
 
 
 # ===== VALIDACION: PESO INT O FLOAT =====
-def validar_peso(texto):
+def validar_peso(texto: str) -> int | float:
     """Regresa el peso como int o float, o lanza PesoInvalidoError."""
     texto = texto.strip()
     # Solo digitos y como maximo un punto decimal
@@ -156,7 +208,7 @@ def validar_peso(texto):
 
 
 # ===== VALIDACION: CONEXION ENTRE DOS NODOS DISTINTOS =====
-def validar_conexion(origen, destino):
+def validar_conexion(origen: str, destino: str) -> None:
     """Lanza ConexionInvalidaError si el origen y el destino son iguales."""
     if origen == destino:
         raise ConexionInvalidaError(
@@ -164,7 +216,7 @@ def validar_conexion(origen, destino):
 
 
 # ===== FORMATO: NUMEROS PARA MOSTRAR =====
-def formato_numero(numero):
+def formato_numero(numero: float) -> str:
     """Muestra 4 en vez de 4.0 y el infinito como simbolo."""
     if numero == float("inf"):
         return "∞"
@@ -174,7 +226,8 @@ def formato_numero(numero):
 
 
 # ===== LISTA DE CONEXIONES: BUSCAR, AGREGAR Y ELIMINAR =====
-def buscar_conexion(conexiones, origen, destino, dirigido=False):
+def buscar_conexion(conexiones: list[Conexion], origen: str, destino: str,
+                    dirigido: bool = False) -> Conexion | None:
     """Regresa la conexion entre origen y destino (o None). Si el grafo no
     es dirigido, A-B y B-A son la misma conexion."""
     for c in conexiones:
@@ -185,7 +238,8 @@ def buscar_conexion(conexiones, origen, destino, dirigido=False):
     return None
 
 
-def agregar_conexion(conexiones, origen, destino, peso, dirigido=False):
+def agregar_conexion(conexiones: list[Conexion], origen: str, destino: str,
+                     peso: float, dirigido: bool = False) -> bool:
     """Agrega la conexion o actualiza su peso si ya existe.
     Regresa True si es nueva y False si solo se actualizo."""
     validar_conexion(origen, destino)
@@ -197,12 +251,12 @@ def agregar_conexion(conexiones, origen, destino, peso, dirigido=False):
     return True
 
 
-def quitar_nodo(conexiones, nombre):
+def quitar_nodo(conexiones: list[Conexion], nombre: str) -> list[Conexion]:
     """Regresa las conexiones sin las que tocan al nodo."""
     return [c for c in conexiones if nombre not in (c["origen"], c["destino"])]
 
 
-def etiqueta_conexion(conexion, dirigido=False):
+def etiqueta_conexion(conexion: Conexion, dirigido: bool = False) -> str:
     """Texto para mostrar una conexion, ej: 'A — B  (peso 4)'."""
     flecha = "→" if dirigido else "—"
     return (f"{conexion['origen']} {flecha} {conexion['destino']}  "
@@ -210,7 +264,8 @@ def etiqueta_conexion(conexion, dirigido=False):
 
 
 # ===== CSV: ESCRIBIR CONEXIONES EN UN ARCHIVO O TEXTO (EXPORTAR) =====
-def escribir_csv(destino, conexiones, nodos=()):
+def escribir_csv(destino: TextIO, conexiones: list[Conexion],
+                 nodos: Iterable[str] = ()) -> None:
     """Escribe encabezados y conexiones en un archivo abierto o StringIO.
     Los nodos sin conexiones se guardan como 'A,,' (sin destino ni peso)."""
     writer = csv.DictWriter(destino, fieldnames=ENCABEZADOS)
@@ -223,7 +278,8 @@ def escribir_csv(destino, conexiones, nodos=()):
             writer.writerow({"origen": nombre, "destino": "", "peso": ""})
 
 
-def conexiones_a_texto(conexiones, nodos=()):
+def conexiones_a_texto(conexiones: list[Conexion],
+                       nodos: Iterable[str] = ()) -> str:
     """Regresa las conexiones (y nodos sueltos) como texto CSV."""
     salida = io.StringIO()
     escribir_csv(salida, conexiones, nodos)

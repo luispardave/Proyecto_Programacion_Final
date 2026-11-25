@@ -14,11 +14,12 @@ import subprocess
 import sys
 
 # Ruta de app.py (junto a este archivo, sin importar desde donde se ejecute)
-RUTA_APP = os.path.join(os.path.dirname(os.path.abspath(__file__)), "app.py")
+RUTA_APP: str = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                             "app.py")
 
 
 # ===== LANZAR LA WEB APP =====
-def main():
+def main() -> None:
     """Ejecuta 'streamlit run app.py' con el mismo Python que corre este
     archivo, asi funciona aunque 'streamlit' no este en el PATH."""
     if importlib.util.find_spec("streamlit") is None:

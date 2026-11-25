@@ -10,6 +10,7 @@ Descripcion: Tematica medieval / ajedrez de la web app: paletas de color
 
 import json
 import math
+from typing import Any
 from string import Template
 
 
@@ -341,13 +342,14 @@ hr {
 
 
 # ===== CSS DEL TEMA =====
-def css(tema):
+def css(tema: str) -> str:
     """Regresa la hoja de estilos con los colores del tema elegido."""
     return _CSS.substitute(PALETAS[tema], fuentes_url=FUENTES_URL)
 
 
 # ===== LIENZO: ACOMODO INICIAL DE LOS NODOS =====
-def posiciones_circulares(nodos):
+def posiciones_circulares(nodos: list[str]
+                          ) -> dict[str, tuple[float, float]]:
     """Acomoda los nodos en circulo, empezando por la izquierda.
     Regresa {nombre: (x, y)} (despues se pueden arrastrar)."""
     n = len(nodos)
@@ -361,12 +363,13 @@ def posiciones_circulares(nodos):
 
 
 # ===== LIENZO: PIEZAS, ARISTAS Y TABLERO =====
-def pieza_de(indice):
+def pieza_de(indice: int) -> str:
     """Pieza de ajedrez fija para el nodo segun su posicion."""
     return PIEZAS[indice % len(PIEZAS)]
 
 
-def nodo_pieza(nombre, pieza, texto, titulo, color, x, y, paleta):
+def nodo_pieza(nombre: str, pieza: str, texto: str, titulo: str, color: str,
+               x: float, y: float, paleta: dict[str, str]) -> dict[str, Any]:
     """Nodo de vis-network dibujado como una pieza de ajedrez con su
     nombre (y distancia) debajo."""
     return {
@@ -381,7 +384,8 @@ def nodo_pieza(nombre, pieza, texto, titulo, color, x, y, paleta):
     }
 
 
-def arista_lienzo(origen, destino, peso, en_camino, paleta):
+def arista_lienzo(origen: str, destino: str, peso: str, en_camino: bool,
+                  paleta: dict[str, str]) -> dict[str, Any]:
     """Arista de vis-network; las del camino mas corto van en dorado."""
     return {
         "from": origen, "to": destino, "label": peso,
@@ -437,7 +441,8 @@ _HTML_LIENZO = Template("""<!doctype html>
 """)
 
 
-def html_lienzo(nodos, aristas, dirigido, paleta, alto):
+def html_lienzo(nodos: list[dict[str, Any]], aristas: list[dict[str, Any]],
+                dirigido: bool, paleta: dict[str, str], alto: int) -> str:
     """HTML del tablero: casillas de ajedrez de fondo y el grafo encima
     (los nodos se pueden arrastrar)."""
     return _HTML_LIENZO.substitute(

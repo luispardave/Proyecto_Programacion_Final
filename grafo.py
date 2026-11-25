@@ -8,27 +8,31 @@ Descripcion: Clase Grafo con algoritmo de Dijkstra. Se arma desde las
 """
 
 
+from collections.abc import Iterable
+
+
 # ===== CLASE NODO =====
 class Nodo:
-    def __init__(self, nombre):
-        self.nombre = nombre
-        self.vecinos = {}
+    def __init__(self, nombre: str) -> None:
+        self.nombre: str = nombre
+        self.vecinos: dict[str, float] = {}   # {vecino: peso}
 
 
 # ===== CLASE GRAFO =====
 class Grafo:
-    def __init__(self, dirigido=False):
-        self.nodos = {}
+    def __init__(self, dirigido: bool = False) -> None:
+        self.nodos: dict[str, Nodo] = {}
         # Si es dirigido, la conexion solo va de origen a destino
-        self.dirigido = dirigido
+        self.dirigido: bool = dirigido
 
     # ----- Agregar un nodo (si no existe) -----
-    def agregar_nodo(self, nombre):
+    def agregar_nodo(self, nombre: str) -> None:
         if nombre not in self.nodos:
             self.nodos[nombre] = Nodo(nombre)
 
     # ----- Agregar conexion entre dos nodos -----
-    def agregar_conexion(self, origen, destino, peso):
+    def agregar_conexion(self, origen: str, destino: str,
+                         peso: float) -> None:
         self.agregar_nodo(origen)
         self.agregar_nodo(destino)
         self.nodos[origen].vecinos[destino] = peso
@@ -37,7 +41,9 @@ class Grafo:
 
     # ----- Armar el grafo desde listas de nodos y conexiones -----
     @classmethod
-    def desde_listas(cls, nodos, conexiones, dirigido=False):
+    def desde_listas(cls, nodos: Iterable[str],
+                     conexiones: Iterable[dict[str, str | float]],
+                     dirigido: bool = False) -> "Grafo":
         """Crea un Grafo con nodos sueltos y conexiones
         [{"origen", "destino", "peso"}, ...]."""
         grafo = cls(dirigido=dirigido)
@@ -48,7 +54,8 @@ class Grafo:
         return grafo
 
     # ----- Matriz de adyacencia -----
-    def matriz_adyacencia(self, orden=None):
+    def matriz_adyacencia(self, orden: Iterable[str] | None = None
+                          ) -> tuple[list[str], list[list[float | None]]]:
         """Regresa (orden, matriz) donde matriz[i][j] es el peso de ir del
         nodo i al nodo j, o None si no hay conexion."""
         orden = list(orden or sorted(self.nodos))
@@ -57,7 +64,8 @@ class Grafo:
         return orden, matriz
 
     # ----- Recorrido tramo por tramo de un camino -----
-    def recorrido(self, camino):
+    def recorrido(self, camino: list[str]
+                  ) -> list[tuple[str, str, float, float]]:
         """Regresa [(origen, siguiente, peso, acumulado), ...]."""
         tramos = []
         acumulado = 0
@@ -70,7 +78,9 @@ class Grafo:
         return tramos
 
     # ----- Dijkstra: distancias minimas desde el nodo de inicio -----
-    def calcular_distancias(self, inicio, destino=None):
+    def calcular_distancias(self, inicio: str, destino: str | None = None
+                            ) -> tuple[dict[str, float],
+                                       dict[str, str | None]]:
         """Regresa (distancias, anteriores). Si no se da destino, calcula
         la distancia minima a todos los nodos."""
         distancias = {}
@@ -115,7 +125,7 @@ class Grafo:
         return distancias, anteriores
 
     # ----- Algoritmo de Dijkstra (camino mas corto) -----
-    def dijkstra(self, inicio, destino):
+    def dijkstra(self, inicio: str, destino: str) -> tuple[float, list[str]]:
         distancias, anteriores = self.calcular_distancias(inicio, destino)
 
         # Si el destino no es alcanzable no hay camino
